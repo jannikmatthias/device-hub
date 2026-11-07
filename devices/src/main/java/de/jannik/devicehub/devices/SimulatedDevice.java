@@ -45,7 +45,16 @@ public class SimulatedDevice implements WebSocket.Listener {
 
     @Override
     public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-        System.out.println(deviceId + " empfängt: " + data);
+        try {
+            Message msg = mapper.readValue(data.toString(), Message.class);
+            if (msg instanceof Message.Command(String name, long ms) && name.equals("setInterval")) {
+                intervalMs = ms;
+                System.out.println(deviceId + ": Intervall jetzt " + intervalMs + " ms");
+                send(new Message.Status(deviceId, intervalMs));
+            }
+        } catch (Exception e) {
+            System.err.println(deviceId + ": konnte Nachricht nicht verarbeiten: " + data);
+        }
         webSocket.request(1);
         return null;
     }

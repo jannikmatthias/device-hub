@@ -1,0 +1,4 @@
+POST http://localhost:8080/devices/sensor-2/commands/set-interval
+Content-Type: application/json
+
+{"intervalMs": 1000}

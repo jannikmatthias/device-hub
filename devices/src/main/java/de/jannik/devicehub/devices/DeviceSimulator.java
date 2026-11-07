@@ -1,10 +1,21 @@
 package de.jannik.devicehub.devices;
 
 import java.net.URI;
+import java.util.concurrent.Executors;
 
 public class DeviceSimulator {
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         URI uri = URI.create("ws://localhost:8080/ws/devices");
-        new SimulatedDevice("sensor-1", uri).run();
+        int count = args.length > 0 ? Integer.parseInt(args[0]) : 3;
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 1; i <= count; i++) {
+                String id = "sensor-" + i;
+                executor.submit(() -> {
+                    new SimulatedDevice(id, uri).run();
+                    return null;
+                });
+            }
+        }
     }
 }
