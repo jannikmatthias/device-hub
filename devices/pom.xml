@@ -11,4 +11,16 @@
 
     <artifactId>devices</artifactId>
 
+    <dependencies>
+        <dependency>
+            <groupId>de.jannik</groupId>
+            <artifactId>protocol</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+    </dependencies>
+
 </project>
