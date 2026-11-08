@@ -4,6 +4,8 @@ import de.jannik.devicehub.protocol.Message;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.*;
 
@@ -19,6 +21,7 @@ public class SimulatedDevice implements WebSocket.Listener {
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> measurementTask;
     private WebSocket ws;
+    long reconnectDelayMs = 1_000;
 
     public SimulatedDevice(String deviceId, URI serverUri) {
         this.deviceId = deviceId;
@@ -27,23 +30,56 @@ public class SimulatedDevice implements WebSocket.Listener {
     }
 
     public void start() {
-        ws = HttpClient.newHttpClient()
-                .newWebSocketBuilder()
-                .buildAsync(serverUri, this)
-                .join();
+        connect();
 
         scheduler.execute(() -> send(new Message.Hello(deviceId)));
         scheduler.scheduleAtFixedRate(this::sendStatus, 0, 10, TimeUnit.SECONDS);
         scheduleMeasurements();
     }
 
+    private void connect() {
+        try {
+            ws = HttpClient.newHttpClient()
+                    .newWebSocketBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .buildAsync(serverUri, this)
+                    .join();
+
+            long reconnectDelayMs = 1_000;
+
+            send(new Message.Hello(deviceId));
+            sendStatus();
+            System.out.println(deviceId + ": verbunden");
+        } catch (Exception e) {
+            System.err.println(deviceId + ": Verbindung fehlgeschlagen, neuer Versuch in "
+                    + reconnectDelayMs + " ms");
+            scheduler.schedule(this::connect, reconnectDelayMs, TimeUnit.MILLISECONDS);
+            //Reconnect backoff
+            reconnectDelayMs = Math.min(reconnectDelayMs * 2, 30_000);
+
+        }
+    }
+
+
     private void send(Message msg) {
+        if(ws == null) {
+            return;
+        }
         try {
             ws.sendText(mapper.writeValueAsString(msg), true).join();
         } catch (Exception e) {
             System.err.println(deviceId + ": Senden fehlgeschlagen: " + e.getMessage());
         }
     }
+
+    private void reconnect() {
+        if (ws != null) {
+            ws.abort();
+            ws = null;
+        }
+        connect();
+    }
+
 
     private void sendStatus() {
         send(new Message.Status(deviceId, intervalMs));
@@ -77,5 +113,16 @@ public class SimulatedDevice implements WebSocket.Listener {
         }
         webSocket.request(1);
         return null;
+    }
+
+    @Override
+    public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+        scheduler.execute(this::reconnect);
+        return null;
+    }
+
+    @Override
+    public void onError(WebSocket webSocket, Throwable error) {
+        scheduler.execute(this::reconnect);
     }
 }
