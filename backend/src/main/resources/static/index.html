@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Device-Hub</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; }
+        table { border-collapse: collapse; }
+        td, th { padding: .4rem .8rem; border-bottom: 1px solid #ddd; text-align: left; }
+        .online { color: green; } .offline { color: #999; }
+    </style>
+</head>
+<body>
+<h1>Geräte</h1>
+<table>
+    <thead><tr><th>Gerät</th><th>Status</th><th>Messwert</th><th>Zeit</th><th>Intervall</th><th></th></tr></thead>
+    <tbody id="devices"></tbody>
+</table>
+
+<script>
+    const devices = new Map();
+
+    function render() {
+        const rows = [...devices.values()]
+            .sort((a, b) => a.deviceId.localeCompare(b.deviceId))
+            .map(d => {
+                const m = d.lastMeasurement;
+                return `<tr>
+          <td>${d.deviceId}</td>
+          <td class="${d.online ? 'online' : 'offline'}">${d.online ? 'online' : 'offline'}</td>
+          <td>${m ? m.value.toFixed(2) : '–'}</td>
+          <td>${m ? new Date(m.timestamp).toLocaleTimeString() : '–'}</td>
+          <td>${d.intervalMs ?? '–'} ms</td>
+          <td><button onclick="setInterval_('${d.deviceId}')" ${d.online ? '' : 'disabled'}>Intervall ändern</button></td>
+        </tr>`;
+            });
+        document.getElementById('devices').innerHTML = rows.join('');
+    }
+
+    async function setInterval_(id) {
+        const ms = Number(prompt('Neues Intervall in ms:', '1000'));
+        if (!ms) return;
+        const res = await fetch(`/devices/${id}/commands/set-interval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ intervalMs: ms })
+        });
+        if (!res.ok) alert(`Fehler: ${res.status}`);
+    }
+
+    async function init() {
+        const list = await (await fetch('/devices')).json();
+        list.forEach(d => devices.set(d.deviceId, d));
+        render();
+
+        const source = new EventSource('/devices/stream');
+        source.addEventListener('device', e => {
+            const d = JSON.parse(e.data);
+            devices.set(d.deviceId, d);
+            render();
+        });
+    }
+
+    init();
+</script>
+</body>
+</html>

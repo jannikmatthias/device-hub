@@ -32,8 +32,7 @@ public class SimulatedDevice implements WebSocket.Listener {
                 .buildAsync(serverUri, this)
                 .join();
 
-        send(new Message.Hello(deviceId));
-
+        scheduler.execute(() -> send(new Message.Hello(deviceId)));
         scheduler.scheduleAtFixedRate(this::sendStatus, 0, 10, TimeUnit.SECONDS);
         scheduleMeasurements();
     }
@@ -71,7 +70,7 @@ public class SimulatedDevice implements WebSocket.Listener {
                 intervalMs = ms;
                 System.out.println(deviceId + ": Intervall jetzt " + intervalMs + " ms");
                 scheduleMeasurements();
-                send(new Message.Status(deviceId, intervalMs));
+                scheduler.execute(() -> send(new Message.Status(deviceId, intervalMs)));
             }
         } catch (Exception e) {
             System.err.println(deviceId + ": konnte Nachricht nicht verarbeiten: " + data);
