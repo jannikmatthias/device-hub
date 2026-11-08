@@ -5,8 +5,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.time.Instant;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.*;
+
 import tools.jackson.databind.json.JsonMapper;
 
 public class SimulatedDevice implements WebSocket.Listener {
@@ -16,14 +16,17 @@ public class SimulatedDevice implements WebSocket.Listener {
     private final String deviceId;
     private final URI serverUri;
     private volatile long intervalMs = 3000;
+    private final ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> measurementTask;
     private WebSocket ws;
 
     public SimulatedDevice(String deviceId, URI serverUri) {
         this.deviceId = deviceId;
         this.serverUri = serverUri;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor();
     }
 
-    public void run() throws InterruptedException {
+    public void start() {
         ws = HttpClient.newHttpClient()
                 .newWebSocketBuilder()
                 .buildAsync(serverUri, this)
@@ -31,16 +34,33 @@ public class SimulatedDevice implements WebSocket.Listener {
 
         send(new Message.Hello(deviceId));
 
-        double value = 20.0;
-        while (!Thread.currentThread().isInterrupted()) {
-            value += ThreadLocalRandom.current().nextDouble(-0.5, 0.5);
-            send(new Message.Measurement(deviceId, value, Instant.now()));
-            Thread.sleep(intervalMs);
+        scheduler.scheduleAtFixedRate(this::sendStatus, 0, 10, TimeUnit.SECONDS);
+        scheduleMeasurements();
+    }
+
+    private void send(Message msg) {
+        try {
+            ws.sendText(mapper.writeValueAsString(msg), true).join();
+        } catch (Exception e) {
+            System.err.println(deviceId + ": Senden fehlgeschlagen: " + e.getMessage());
         }
     }
 
-    private synchronized void send(Message msg) {
-        ws.sendText(mapper.writeValueAsString(msg), true).join();
+    private void sendStatus() {
+        send(new Message.Status(deviceId, intervalMs));
+    }
+
+    private void sendMeasurement() {
+        double value = 20 + ThreadLocalRandom.current().nextDouble(-0.5, 0.5);
+        send(new Message.Measurement(deviceId, value, Instant.now()));
+    }
+
+    private void scheduleMeasurements() {
+        if (measurementTask != null) {
+            measurementTask.cancel(false);
+        }
+        measurementTask = scheduler.scheduleAtFixedRate(
+                this::sendMeasurement, 0, intervalMs, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -50,6 +70,7 @@ public class SimulatedDevice implements WebSocket.Listener {
             if (msg instanceof Message.Command(String name, long ms) && name.equals("setInterval")) {
                 intervalMs = ms;
                 System.out.println(deviceId + ": Intervall jetzt " + intervalMs + " ms");
+                scheduleMeasurements();
                 send(new Message.Status(deviceId, intervalMs));
             }
         } catch (Exception e) {
