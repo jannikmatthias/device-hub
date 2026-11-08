@@ -22,11 +22,12 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(DeviceWebSocketHandler.class);
     private final JsonMapper mapper;
-
+    private final DeviceRegistry deviceRegistry;
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
-    public DeviceWebSocketHandler(JsonMapper mapper) {
+    public DeviceWebSocketHandler(JsonMapper mapper, DeviceRegistry deviceRegistry) {
         this.mapper = mapper;
+        this.deviceRegistry = deviceRegistry;
     }
 
     @Override
@@ -43,15 +44,28 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
             if(msg instanceof Message.Hello hello) {
                 //Decorator: behandelt gleichzeitiges sendMessage
                 sessions.put(hello.deviceId(), new ConcurrentWebSocketSessionDecorator(session, 5_000, 64 * 1024));
+                deviceRegistry.setIsOnline(hello.deviceId(), true);
+                session.getAttributes().put("deviceId", hello.deviceId());
+            } else if (msg instanceof Message.Measurement measurement) {
+                deviceRegistry.setLastMeasurement(measurement.deviceId(), measurement.value());
+            } else if (msg instanceof Message.Status statusMsg) {
+                deviceRegistry.setIntervalMs(statusMsg.deviceId(), statusMsg.intervalMs());
             }
+
         } catch (JacksonException e) {
             log.warn("Ungültige Nachricht von {}: {}", session.getId(), text.getPayload());
         }
     }
 
+
     @Override
     public void afterConnectionClosed(WebSocketSession session, @NonNull CloseStatus status) {
-        log.info("Getrennt: {} ({})", session.getId(), status);
+        String deviceId = (String) session.getAttributes().get("deviceId");
+        if (deviceId != null) {
+            sessions.remove(deviceId);
+        }
+        deviceRegistry.setIsOnline(deviceId, false);
+        log.info("Getrennt: {} ({}) ({})", deviceId, session.getId(), status);
     }
 
     /** @return false, wenn das Gerät nicht verbunden ist */
