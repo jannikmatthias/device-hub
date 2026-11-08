@@ -47,7 +47,7 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
                 deviceRegistry.setIsOnline(hello.deviceId(), true);
                 session.getAttributes().put("deviceId", hello.deviceId());
             } else if (msg instanceof Message.Measurement measurement) {
-                deviceRegistry.setLastMeasurement(measurement.deviceId(), measurement.value());
+                deviceRegistry.setLastMeasurement(measurement.deviceId(), measurement.value(), measurement.timestamp());
             } else if (msg instanceof Message.Status statusMsg) {
                 deviceRegistry.setIntervalMs(statusMsg.deviceId(), statusMsg.intervalMs());
             }
