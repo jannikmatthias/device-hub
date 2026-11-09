@@ -52,18 +52,4 @@ public class DeviceRegistry {
 
     }
 
-    private void printState() {
-        StringBuilder sb = new StringBuilder("Gerätezustand:");
-        states.values().stream()
-                .sorted(Comparator.comparing(DeviceState::deviceId))
-                .forEach(s -> {
-                    DeviceState.Measurement m = s.lastMeasurement();
-                    sb.append(String.format("%n  %-10s online=%-5s interval=%-6s last=%s",
-                            s.deviceId(),
-                            s.online(),
-                            s.intervalMs(),
-                            m == null ? "-" : String.format("%.2f @ %s", m.value(), m.timestamp())));
-                });
-        log.info(sb.toString());
-    }
 }

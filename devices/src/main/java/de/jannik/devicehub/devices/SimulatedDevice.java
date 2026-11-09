@@ -45,7 +45,7 @@ public class SimulatedDevice implements WebSocket.Listener {
                     .buildAsync(serverUri, this)
                     .join();
 
-            long reconnectDelayMs = 1_000;
+            reconnectDelayMs = 1_000;
 
             send(new Message.Hello(deviceId));
             sendStatus();

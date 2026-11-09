@@ -63,8 +63,9 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
         String deviceId = (String) session.getAttributes().get("deviceId");
         if (deviceId != null) {
             sessions.remove(deviceId);
+            deviceRegistry.setIsOnline(deviceId, false);
         }
-        deviceRegistry.setIsOnline(deviceId, false);
+
         log.info("Getrennt: {} ({}) ({})", deviceId, session.getId(), status);
     }
 
