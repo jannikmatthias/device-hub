@@ -12,7 +12,7 @@ public class DeviceController {
     private final DeviceWebSocketHandler deviceHandler;
 
 
-    public DeviceController(DeviceWebSocketHandler deviceHandler, DeviceRegistry deviceRegistry) {
+    public DeviceController(DeviceWebSocketHandler deviceHandler) {
         this.deviceHandler = deviceHandler;
     }
 

@@ -61,7 +61,7 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
         switch (msg) {
             case Message.Measurement m -> deviceRegistry.setLastMeasurement(deviceId, m.value(), m.timestamp());
             case Message.Status s      -> deviceRegistry.setIntervalMs(deviceId, s.intervalMs());
-            case Message.Command c     -> log.warn("{} hat einen Command geschickt, ignoriert", deviceId);
+            case Message.Command ignored -> log.warn("{} hat einen Command geschickt, ignoriert", deviceId);
             // oben behandelt
             default -> throw new IllegalStateException("Unexpected value: " + msg);
         }

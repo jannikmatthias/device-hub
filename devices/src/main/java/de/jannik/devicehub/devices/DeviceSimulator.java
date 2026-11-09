@@ -1,9 +1,6 @@
 package de.jannik.devicehub.devices;
 
-import javax.swing.plaf.TableHeaderUI;
 import java.net.URI;
-import java.time.Duration;
-import java.util.concurrent.Executors;
 
 public class DeviceSimulator {
     public static void main(String[] args) throws InterruptedException {
