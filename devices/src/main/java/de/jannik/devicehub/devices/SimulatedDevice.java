@@ -32,8 +32,7 @@ public class SimulatedDevice implements WebSocket.Listener {
     public void start() {
         connect();
 
-        scheduler.execute(() -> send(new Message.Hello(deviceId)));
-        statusTask = scheduler.scheduleAtFixedRate(this::sendStatus, 0, 10, TimeUnit.SECONDS);
+        statusTask = scheduler.scheduleAtFixedRate(this::sendStatus, 10, 10, TimeUnit.SECONDS);
         scheduleMeasurements();
     }
 

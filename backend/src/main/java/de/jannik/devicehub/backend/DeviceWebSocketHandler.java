@@ -78,8 +78,15 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, @NonNull CloseStatus status) {
         String deviceId = (String) session.getAttributes().get("deviceId");
         if (deviceId != null) {
-            sessions.remove(deviceId);
-            deviceRegistry.setIsOnline(deviceId, false);
+            // Nur entfernen, wenn noch diese Session eingetragen ist. Hat sich das Gerät
+            // inzwischen neu verbunden, nicht entfernen.
+            WebSocketSession webSocketSession = sessions.computeIfPresent(deviceId,
+                    (id, current) -> current.getId().equals(session.getId()) ? null : current);
+
+            boolean removed = webSocketSession == null;
+            if (removed) {
+                deviceRegistry.setIsOnline(deviceId, false);
+            }
         }
 
         log.info("Getrennt: {} ({}) ({})", deviceId, session.getId(), status);
