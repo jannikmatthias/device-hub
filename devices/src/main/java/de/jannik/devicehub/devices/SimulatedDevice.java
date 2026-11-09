@@ -4,7 +4,6 @@ import de.jannik.devicehub.protocol.Message;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.*;
@@ -20,6 +19,7 @@ public class SimulatedDevice implements WebSocket.Listener {
     private volatile long intervalMs = 3000;
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> measurementTask;
+    ScheduledFuture<?> statusTask;
     private WebSocket ws;
     long reconnectDelayMs = 1_000;
 
@@ -33,10 +33,15 @@ public class SimulatedDevice implements WebSocket.Listener {
         connect();
 
         scheduler.execute(() -> send(new Message.Hello(deviceId)));
-        scheduler.scheduleAtFixedRate(this::sendStatus, 0, 10, TimeUnit.SECONDS);
+        statusTask = scheduler.scheduleAtFixedRate(this::sendStatus, 0, 10, TimeUnit.SECONDS);
         scheduleMeasurements();
     }
 
+    public void cancelAllMessageSends() {
+        statusTask.cancel(false);
+        measurementTask.cancel(false);
+        scheduler.close();
+    }
     private void connect() {
         try {
             ws = HttpClient.newHttpClient()
