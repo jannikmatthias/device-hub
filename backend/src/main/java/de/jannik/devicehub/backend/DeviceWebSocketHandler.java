@@ -4,6 +4,7 @@ import de.jannik.devicehub.protocol.Message;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -82,6 +83,23 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
         }
 
         log.info("Getrennt: {} ({}) ({})", deviceId, session.getId(), status);
+    }
+
+    /**
+     * Der Heartbeat-Check hat das Gerät offline gesetzt: die (vermutlich halboffene) Session schließen,
+     * damit keine Befehle mehr ins Leere gehen und das Gerät sich neu verbinden muss.
+     */
+    @EventListener
+    public void onDeviceTimedOut(DeviceTimedOutEvent event) {
+        WebSocketSession session = sessions.remove(event.deviceId());
+        if (session == null) {
+            return;
+        }
+        try {
+            session.close(CloseStatus.SESSION_NOT_RELIABLE);
+        } catch (IOException e) {
+            log.debug("Schließen der Session von {} fehlgeschlagen", event.deviceId(), e);
+        }
     }
 
     /** @return false, wenn das Gerät nicht verbunden ist */
