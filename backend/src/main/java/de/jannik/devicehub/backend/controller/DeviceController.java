@@ -10,8 +10,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/devices")
 public class DeviceController {
 
-    private final DeviceWebSocketHandler deviceHandler;
+    /**
+     * Untergrenze für das Messintervall. Schützt das Gerät (0 oder negative Werte lassen den
+     * Simulator die Messungen einstellen) und das Backend (sehr kleine Werte fluten es mit Nachrichten).
+     */
+    static final long MIN_INTERVAL_MS = 500;
 
+    private final DeviceWebSocketHandler deviceHandler;
 
     public DeviceController(DeviceWebSocketHandler deviceHandler) {
         this.deviceHandler = deviceHandler;
@@ -22,6 +27,9 @@ public class DeviceController {
     @PostMapping("/{id}/commands/set-interval")
     public ResponseEntity<Void> setInterval(@PathVariable String id,
                                             @RequestBody IntervalRequest request) throws IOException {
+        if (request.intervalMs() < MIN_INTERVAL_MS) {
+            return ResponseEntity.badRequest().build();
+        }
         boolean sent = deviceHandler.sendCommand(id,
                 new Message.Command("setInterval", request.intervalMs()));
         return sent ? ResponseEntity.accepted().build() : ResponseEntity.notFound().build();

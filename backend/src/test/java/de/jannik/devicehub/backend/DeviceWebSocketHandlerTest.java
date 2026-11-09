@@ -54,6 +54,16 @@ class DeviceWebSocketHandlerTest {
         verify(oldSession, never()).sendMessage(any());
     }
 
+    @Test
+    void closeOfCurrentSessionSetsDeviceOffline() throws Exception {
+        WebSocketSession session = session("s1");
+
+        handler.handleTextMessage(session, json(new Message.Hello("sensor-1")));
+        handler.afterConnectionClosed(session, CloseStatus.NORMAL);
+
+        assertThat(device("sensor-1")).hasValueSatisfying(d -> assertThat(d.online()).isFalse());
+        assertThat(handler.sendCommand("sensor-1", new Message.Command("setInterval", 1000))).isFalse();
+    }
 
     @Test
     void messageBeforeHelloClosesSessionAndIsIgnored() throws Exception {

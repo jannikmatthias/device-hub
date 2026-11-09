@@ -104,13 +104,13 @@ Dashboard als offline.
 **`DeviceRegistry`** hält den Zustand aller Geräte (`DeviceState`, unveränderliche Records in einer
   `ConcurrentHashMap`) und prüft per `@Scheduled`, ob ein Gerät innerhalb der letzten 30 Sekunden 
   eine Nachricht gesendet hat, wenn nicht, wird ein `DeviceTimedOutEvent` gemeldet und der Handler schließt daraufhin die Session.
-  Jede Änderung wird als `DeviceChangedEvent` and den DashboardController gesendet. 
+  Jede Änderung wird als `DeviceChangedEvent` an den DashboardController gesendet. 
 
 **`DashboardController`** ist für das Dashboard zuständig. `GET /devices` liefert eine
   Momentaufnahme, `GET /devices/stream` schickt jede Änderung (bei `DeviceChangedEvent`) als Server-Sent Event an den Browser.
 
 **`DeviceController`** nimmt den Befehl vom Button entgegen und lässt ihn über den Handler an das
-  Gerät senden. Antworten: `202` = gesendet, `404` = Gerät nicht verbunden.
+  Gerät senden. Antworten: `202` = gesendet, `400` = Intervall < 500 ms, `404` = Gerät nicht verbunden.
 
 Das Projekt ist ein Maven-Multi-Modul-Build:
 
