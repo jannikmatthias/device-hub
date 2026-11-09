@@ -32,9 +32,12 @@ public class DashboardController {
     public SseEmitter stream() {
         SseEmitter emitter = new SseEmitter(0L);  // 0 = kein Timeout
         emitters.add(emitter);
+
+        // emitters entfernen, wenn Verbindung getrennt
         emitter.onCompletion(() -> emitters.remove(emitter));
         emitter.onTimeout(() -> emitters.remove(emitter));
         emitter.onError(e -> emitters.remove(emitter));
+
         return emitter;
     }
 

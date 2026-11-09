@@ -90,8 +90,10 @@ public class DeviceRegistry {
         }
     }
 
-    // --- intern ---
 
+    /**
+     * setze neuen DeviceState in states mit aktueller Zeit als lastSeen
+     */
     private void updateFromDevice(String deviceId, UnaryOperator<DeviceState> change) {
         Instant now = clock.instant();
         update(deviceId, s -> change.apply(s).withLastSeen(now));

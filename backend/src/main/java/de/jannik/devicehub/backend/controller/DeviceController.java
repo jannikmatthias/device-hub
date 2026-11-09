@@ -28,10 +28,12 @@ public class DeviceController {
     public ResponseEntity<Void> setInterval(@PathVariable String id,
                                             @RequestBody IntervalRequest request) throws IOException {
         if (request.intervalMs() < MIN_INTERVAL_MS) {
+            //400 senden
             return ResponseEntity.badRequest().build();
         }
         boolean sent = deviceHandler.sendCommand(id,
                 new Message.Command("setInterval", request.intervalMs()));
+        //202 oder 404 senden
         return sent ? ResponseEntity.accepted().build() : ResponseEntity.notFound().build();
     }
 }
