@@ -36,27 +36,42 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage text) {
+    protected void handleTextMessage(@NonNull WebSocketSession session, TextMessage text) throws IOException {
+        Message msg;
         try {
-            Message msg = mapper.readValue(text.getPayload(), Message.class);
-            log.info("Empfangen von {}: {}", session.getId(), msg);
-
-            if(msg instanceof Message.Hello hello) {
-                //Decorator: behandelt gleichzeitiges sendMessage
-                sessions.put(hello.deviceId(), new ConcurrentWebSocketSessionDecorator(session, 5_000, 64 * 1024));
-                deviceRegistry.setIsOnline(hello.deviceId(), true);
-                session.getAttributes().put("deviceId", hello.deviceId());
-            } else if (msg instanceof Message.Measurement measurement) {
-                deviceRegistry.setLastMeasurement(measurement.deviceId(), measurement.value(), measurement.timestamp());
-            } else if (msg instanceof Message.Status statusMsg) {
-                deviceRegistry.setIntervalMs(statusMsg.deviceId(), statusMsg.intervalMs());
-            }
-
+            msg = mapper.readValue(text.getPayload(), Message.class);
         } catch (JacksonException e) {
             log.warn("Ungültige Nachricht von {}: {}", session.getId(), text.getPayload());
+            return;
+        }
+
+        String deviceId = (String) session.getAttributes().get("deviceId");
+
+        if (msg instanceof Message.Hello hello) {
+            handleHello(session, hello);
+            return;
+        }
+        if (deviceId == null) {
+            log.warn("Nachricht vor Hello von {}, Verbindung wird geschlossen", session.getId());
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
+        switch (msg) {
+            case Message.Measurement m -> deviceRegistry.setLastMeasurement(deviceId, m.value(), m.timestamp());
+            case Message.Status s      -> deviceRegistry.setIntervalMs(deviceId, s.intervalMs());
+            case Message.Command c     -> log.warn("{} hat einen Command geschickt, ignoriert", deviceId);
+            // oben behandelt
+            default -> throw new IllegalStateException("Unexpected value: " + msg);
         }
     }
 
+    private void handleHello(WebSocketSession session, Message.@NonNull Hello hello) {
+        //Decorator: behandelt gleichzeitiges sendMessage
+        sessions.put(hello.deviceId(), new ConcurrentWebSocketSessionDecorator(session, 5_000, 64 * 1024));
+        deviceRegistry.setIsOnline(hello.deviceId(), true);
+        session.getAttributes().put("deviceId", hello.deviceId());
+    }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, @NonNull CloseStatus status) {
