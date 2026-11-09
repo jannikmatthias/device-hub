@@ -55,7 +55,7 @@ schickt, die Verbindung aber offen lässt. Nach dem Heartbeat-Timeout (30 s) ers
 Dashboard als offline.
 
 ```bash
-./mvnw -pl devices exec:java -Dexec.mainClass=de.jannik.devicehub.devices.FailedDeviceSimulator
+./mvnw -pl devices exec:java "-Dexec.mainClass=de.jannik.devicehub.devices.FailedDeviceSimulator"
 ```
 
 ### Tests

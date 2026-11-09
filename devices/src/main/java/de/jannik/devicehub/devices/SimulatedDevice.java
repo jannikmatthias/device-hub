@@ -51,8 +51,9 @@ public class SimulatedDevice implements WebSocket.Listener {
 
             reconnectDelayMs = 1_000;
 
-            send(new Message.Hello(deviceId));
-            sendStatus();
+            scheduler.execute( () -> send(new Message.Hello(deviceId)));
+            scheduler.execute( () ->  sendStatus());
+
             System.out.println(deviceId + ": verbunden");
         } catch (Exception e) {
             System.err.println(deviceId + ": Verbindung fehlgeschlagen, neuer Versuch in "
