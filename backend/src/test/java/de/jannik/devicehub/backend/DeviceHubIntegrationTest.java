@@ -3,6 +3,7 @@ package de.jannik.devicehub.backend;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import de.jannik.devicehub.backend.registry.DeviceState;
 import de.jannik.devicehub.protocol.Message;
 import java.net.URI;
 import java.net.http.HttpClient;

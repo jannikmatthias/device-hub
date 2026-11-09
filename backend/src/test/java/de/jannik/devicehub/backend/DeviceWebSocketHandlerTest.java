@@ -7,6 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.jannik.devicehub.backend.registry.DeviceRegistry;
+import de.jannik.devicehub.backend.registry.DeviceState;
+import de.jannik.devicehub.backend.websocket.DeviceWebSocketHandler;
 import de.jannik.devicehub.protocol.Message;
 import java.time.Duration;
 import java.time.Instant;

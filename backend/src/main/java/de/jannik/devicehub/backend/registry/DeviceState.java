@@ -1,4 +1,4 @@
-package de.jannik.devicehub.backend;
+package de.jannik.devicehub.backend.registry;
 
 import java.time.Instant;
 

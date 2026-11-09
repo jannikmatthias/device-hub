@@ -1,4 +1,4 @@
-package de.jannik.devicehub.backend;
+package de.jannik.devicehub.backend.registry;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
+
+import de.jannik.devicehub.backend.events.DeviceChangedEvent;
+import de.jannik.devicehub.backend.events.DeviceTimedOutEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

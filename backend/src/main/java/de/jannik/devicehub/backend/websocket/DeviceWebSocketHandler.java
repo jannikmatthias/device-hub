@@ -1,5 +1,7 @@
-package de.jannik.devicehub.backend;
+package de.jannik.devicehub.backend.websocket;
 
+import de.jannik.devicehub.backend.events.DeviceTimedOutEvent;
+import de.jannik.devicehub.backend.registry.DeviceRegistry;
 import de.jannik.devicehub.protocol.Message;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -37,7 +39,7 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    protected void handleTextMessage(@NonNull WebSocketSession session, TextMessage text) throws IOException {
+    public void handleTextMessage(@NonNull WebSocketSession session, TextMessage text) throws IOException {
         Message msg;
         try {
             msg = mapper.readValue(text.getPayload(), Message.class);

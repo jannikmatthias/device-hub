@@ -1,8 +1,12 @@
-package de.jannik.devicehub.backend;
+package de.jannik.devicehub.backend.controller;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import de.jannik.devicehub.backend.events.DeviceChangedEvent;
+import de.jannik.devicehub.backend.registry.DeviceRegistry;
+import de.jannik.devicehub.backend.registry.DeviceState;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;

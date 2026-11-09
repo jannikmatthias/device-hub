@@ -1,4 +1,4 @@
-package de.jannik.devicehub.backend;
+package de.jannik.devicehub.backend.websocket;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;

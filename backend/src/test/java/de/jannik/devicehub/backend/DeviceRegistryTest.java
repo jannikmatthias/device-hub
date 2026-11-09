@@ -6,6 +6,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+
+import de.jannik.devicehub.backend.events.DeviceTimedOutEvent;
+import de.jannik.devicehub.backend.registry.DeviceRegistry;
+import de.jannik.devicehub.backend.registry.DeviceState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
