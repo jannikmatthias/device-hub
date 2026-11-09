@@ -20,27 +20,45 @@
 <script>
     const devices = new Map();
 
+    // Werte von den Geräten kommen nur über textContent ins DOM,
+    // nie über innerHTML. So kann eine manipulierte ID kein HTML/Skript einschleusen.
+    function cell(text, className) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (className) td.className = className;
+        return td;
+    }
+
     function render() {
         const rows = [...devices.values()]
             .sort((a, b) => a.deviceId.localeCompare(b.deviceId))
             .map(d => {
                 const m = d.lastMeasurement;
-                return `<tr>
-          <td>${d.deviceId}</td>
-          <td class="${d.online ? 'online' : 'offline'}">${d.online ? 'online' : 'offline'}</td>
-          <td>${m ? m.value.toFixed(2) : '–'}</td>
-          <td>${m ? new Date(m.timestamp).toLocaleTimeString() : '–'}</td>
-          <td>${d.intervalMs ?? '–'} ms</td>
-          <td><button onclick="setInterval_('${d.deviceId}')" ${d.online ? '' : 'disabled'}>Intervall ändern</button></td>
-        </tr>`;
+                const tr = document.createElement('tr');
+                tr.append(
+                    cell(d.deviceId),
+                    cell(d.online ? 'online' : 'offline', d.online ? 'online' : 'offline'),
+                    cell(m ? m.value.toFixed(2) : '–'),
+                    cell(m ? new Date(m.timestamp).toLocaleTimeString() : '–'),
+                    cell(d.intervalMs != null ? `${d.intervalMs} ms` : '–')
+                );
+
+                const button = document.createElement('button');
+                button.textContent = 'Intervall ändern';
+                button.disabled = !d.online;
+                button.addEventListener('click', () => changeInterval(d.deviceId));
+                const actionCell = document.createElement('td');
+                actionCell.append(button);
+                tr.append(actionCell);
+                return tr;
             });
-        document.getElementById('devices').innerHTML = rows.join('');
+        document.getElementById('devices').replaceChildren(...rows);
     }
 
-    async function setInterval_(id) {
+    async function changeInterval(id) {
         const ms = Number(prompt('Neues Intervall in ms:', '1000'));
         if (!ms) return;
-        const res = await fetch(`/devices/${id}/commands/set-interval`, {
+        const res = await fetch(`/devices/${encodeURIComponent(id)}/commands/set-interval`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ intervalMs: ms })
