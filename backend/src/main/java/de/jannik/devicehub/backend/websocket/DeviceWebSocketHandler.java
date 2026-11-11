@@ -48,6 +48,7 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        //null, wenn noch keine Hello message
         String deviceId = (String) session.getAttributes().get("deviceId");
 
         if (msg instanceof Message.Hello hello) {

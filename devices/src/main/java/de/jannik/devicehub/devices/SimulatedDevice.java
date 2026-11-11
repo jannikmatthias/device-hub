@@ -20,8 +20,12 @@ public class SimulatedDevice implements WebSocket.Listener {
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> measurementTask;
     ScheduledFuture<?> statusTask;
-    private WebSocket ws;
+    private volatile WebSocket ws;
     long reconnectDelayMs = 1_000;
+    // goSilent(): sendet nichts mehr und beendet sich, sobald das Backend die Verbindung schließt
+    private volatile boolean silent;
+    // stop(): kein Reconnect mehr
+    private volatile boolean stopped;
 
     public SimulatedDevice(String deviceId, URI serverUri) {
         this.deviceId = deviceId;
@@ -36,12 +40,33 @@ public class SimulatedDevice implements WebSocket.Listener {
         scheduleMeasurements();
     }
 
-    public void cancelAllMessageSends() {
-        statusTask.cancel(false);
-        measurementTask.cancel(false);
-        scheduler.close();
+    /**
+     * Simuliert einen Ausfall: Das Gerät sendet nichts mehr, lässt die Verbindung aber offen
+     * (halboffene Verbindung). Der Scheduler läuft weiter und hält den Prozess am Leben.
+     * Schließt das Backend die Verbindung, verbindet sich das Gerät nicht neu, sondern beendet sich.
+     */
+    public void goSilent() {
+        silent = true;
+        scheduler.execute(() -> {
+            statusTask.cancel(false);
+            measurementTask.cancel(false);
+        });
     }
+
+    /** Beendet das Gerät: Verbindung trennen, kein Reconnect. */
+    public void stop() {
+        stopped = true;
+        scheduler.shutdownNow();
+        WebSocket current = ws;
+        if (current != null) {
+            current.abort();
+        }
+    }
+
     private void connect() {
+        if (stopped) {
+            return;
+        }
         try {
             ws = HttpClient.newHttpClient()
                     .newWebSocketBuilder()
@@ -49,13 +74,23 @@ public class SimulatedDevice implements WebSocket.Listener {
                     .buildAsync(serverUri, this)
                     .join();
 
+            if (stopped) {
+                // stop() kam während des Verbindungsaufbaus
+                ws.abort();
+                return;
+            }
+
             reconnectDelayMs = 1_000;
 
-            scheduler.execute( () -> send(new Message.Hello(deviceId)));
-            scheduler.execute( () ->  sendStatus());
+            //sende immer im Scheduler Thread -> verhindert gleichzeitiges senden
+            scheduler.execute(() -> send(new Message.Hello(deviceId)));
+            scheduler.execute(() ->  sendStatus());
 
             System.out.println(deviceId + ": verbunden");
         } catch (Exception e) {
+            if (stopped) {
+                return;
+            }
             System.err.println(deviceId + ": Verbindung fehlgeschlagen, neuer Versuch in "
                     + reconnectDelayMs + " ms");
             scheduler.schedule(this::connect, reconnectDelayMs, TimeUnit.MILLISECONDS);
@@ -110,8 +145,10 @@ public class SimulatedDevice implements WebSocket.Listener {
             if (msg instanceof Message.Command(String name, long ms) && name.equals("setInterval")) {
                 intervalMs = ms;
                 System.out.println(deviceId + ": Intervall jetzt " + intervalMs + " ms");
-                scheduleMeasurements();
-                scheduler.execute(() -> send(new Message.Status(deviceId, intervalMs)));
+                scheduler.execute(() -> {
+                    scheduleMeasurements();
+                    sendStatus();
+                });
             }
         } catch (Exception e) {
             System.err.println(deviceId + ": konnte Nachricht nicht verarbeiten: " + data);
@@ -122,12 +159,28 @@ public class SimulatedDevice implements WebSocket.Listener {
 
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-        scheduler.execute(this::reconnect);
+        onDisconnected();
         return null;
     }
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
-        scheduler.execute(this::reconnect);
+        onDisconnected();
+    }
+
+    private void onDisconnected() {
+        if (silent) {
+            System.out.println(deviceId + ": Verbindung vom Backend geschlossen, Gerät beendet sich");
+            stop();
+            return;
+        }
+        if (stopped) {
+            return;
+        }
+        try {
+            scheduler.execute(this::reconnect);
+        } catch (RejectedExecutionException e) {
+            // stop() kam dazwischen, der Scheduler nimmt nichts mehr an
+        }
     }
 }

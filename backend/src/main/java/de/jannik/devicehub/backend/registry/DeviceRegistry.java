@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
 import de.jannik.devicehub.backend.events.DeviceChangedEvent;
@@ -71,18 +72,18 @@ public class DeviceRegistry {
         Instant threshold = clock.instant().minus(heartbeatTimeout);
 
         for (String deviceId : states.keySet()) {
-            boolean[] timedOut = {false};
+            AtomicBoolean timedOut = new AtomicBoolean(false);
 
             // Prüfen und Setzen in einem atomaren Schritt
             DeviceState updated = states.computeIfPresent(deviceId, (id, s) -> {
                 if (s.online() && s.lastSeen() != null && s.lastSeen().isBefore(threshold)) {
-                    timedOut[0] = true;
+                    timedOut.set(true);
                     return s.withOnline(false);
                 }
                 return s;
             });
 
-            if (timedOut[0]) {
+            if (timedOut.get()) {
                 log.warn("{}: seit {} keine Nachricht, wird offline gesetzt", deviceId, heartbeatTimeout);
                 events.publishEvent(new DeviceChangedEvent(updated));
                 events.publishEvent(new DeviceTimedOutEvent(deviceId));

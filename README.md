@@ -52,7 +52,7 @@ curl -X POST -H "Content-Type: application/json" -d '{"intervalMs":1000}' http:/
 
 `FailedDeviceSimulator` startet ein Gerät `sensor-fail`, das nach 10 Sekunden keine Nachrichten mehr
 schickt, die Verbindung aber offen lässt. Nach dem Heartbeat-Timeout (30 s) erscheint es im
-Dashboard als offline.
+Dashboard als offline. Das Backend schließt daraufhin die Verbindung und der Simulator beendet sich.
 
 ```bash
 ./mvnw -pl devices exec:java "-Dexec.mainClass=de.jannik.devicehub.devices.FailedDeviceSimulator"

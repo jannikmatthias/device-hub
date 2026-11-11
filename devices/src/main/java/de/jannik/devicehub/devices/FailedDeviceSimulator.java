@@ -6,6 +6,7 @@ import java.time.Duration;
 /**
  * Simuliert ein Gerät, das nach 10 Sekunden verstummt, die Verbindung aber offen lässt
  * (halboffene Verbindung). Das Backend muss es per Heartbeat-Timeout offline setzen.
+ * Der Prozess läuft weiter, bis das Backend die Verbindung schließt.
  * <p>
  * Argument (optional): {@code [backend-url]}
  */
@@ -17,6 +18,7 @@ public class FailedDeviceSimulator {
         SimulatedDevice simulatedDevice = new SimulatedDevice("sensor-fail", uri);
         simulatedDevice.start();
         Thread.sleep(Duration.ofSeconds(10));
-        simulatedDevice.cancelAllMessageSends();
+        System.out.println("sensor-fail: sendet ab jetzt nichts mehr, Verbindung bleibt offen");
+        simulatedDevice.goSilent();
     }
 }
