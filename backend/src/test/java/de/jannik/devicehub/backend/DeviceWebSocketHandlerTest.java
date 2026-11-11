@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.jannik.devicehub.backend.events.DeviceTimedOutEvent;
 import de.jannik.devicehub.backend.registry.DeviceRegistry;
 import de.jannik.devicehub.backend.registry.DeviceState;
 import de.jannik.devicehub.backend.websocket.DeviceWebSocketHandler;
@@ -63,6 +64,25 @@ class DeviceWebSocketHandlerTest {
 
         assertThat(device("sensor-1")).hasValueSatisfying(d -> assertThat(d.online()).isFalse());
         assertThat(handler.sendCommand("sensor-1", new Message.Command("setInterval", 1000))).isFalse();
+    }
+
+    @Test
+    void timedOutDeviceSessionIsClosedAndReceivesNoMoreCommands() throws Exception {
+        WebSocketSession session = session("s1");
+        handler.handleTextMessage(session, json(new Message.Hello("sensor-1")));
+
+        handler.onDeviceTimedOut(new DeviceTimedOutEvent("sensor-1"));
+
+        verify(session).close(CloseStatus.SESSION_NOT_RELIABLE);
+        assertThat(handler.sendCommand("sensor-1", new Message.Command("setInterval", 1000))).isFalse();
+        verify(session, never()).sendMessage(any());
+    }
+
+    @Test
+    void timeoutOfUnknownDeviceIsIgnored() {
+        handler.onDeviceTimedOut(new DeviceTimedOutEvent("does-not-exist"));
+
+        assertThat(registry.all()).isEmpty();
     }
 
     @Test

@@ -12,9 +12,9 @@ Messintervall eines Geräts ändern.
 
 ## Starten
 
-Alle Befehle im Projektverzeichnis. Unter Windows (cmd/PowerShell) `mvnw.cmd` statt `./mvnw` verwenden.
+Alle Befehle im Projektverzeichnis.
 
-**1. Einmalig bauen** (installiert das gemeinsame `protocol`-Modul ins lokale Repository):
+**1. Einmalig bauen**:
 
 ```bash
 ./mvnw install -DskipTests
