@@ -1,4 +1,4 @@
-package de.jannik.devicehub.backend;
+package de.jannik.devicehub.backend.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -7,10 +7,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.jannik.devicehub.backend.helper.MutableClock;
 import de.jannik.devicehub.backend.events.DeviceTimedOutEvent;
 import de.jannik.devicehub.backend.registry.DeviceRegistry;
 import de.jannik.devicehub.backend.registry.DeviceState;
-import de.jannik.devicehub.backend.websocket.DeviceWebSocketHandler;
 import de.jannik.devicehub.protocol.Message;
 import java.time.Duration;
 import java.time.Instant;

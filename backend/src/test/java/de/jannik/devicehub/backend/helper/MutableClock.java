@@ -1,4 +1,4 @@
-package de.jannik.devicehub.backend;
+package de.jannik.devicehub.backend.helper;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -7,15 +7,15 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 
 /** Uhr für Tests, die man von Hand vorstellen kann. */
-class MutableClock extends Clock {
+public class MutableClock extends Clock {
 
     private Instant now;
 
-    MutableClock(Instant start) {
+    public MutableClock(Instant start) {
         this.now = start;
     }
 
-    void advance(Duration duration) {
+    public void advance(Duration duration) {
         now = now.plus(duration);
     }
 
