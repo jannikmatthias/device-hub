@@ -72,12 +72,21 @@ public class SimulatedDevice implements WebSocket.Listener {
             return;
         }
         try {
-            ws = HttpClient.newHttpClient()
-                    .newWebSocketBuilder()
-                    .header("Authorization", "Bearer " + token)
-                    .connectTimeout(Duration.ofSeconds(5))
-                    .buildAsync(serverUri, this)
-                    .join();
+            if(token == null) {
+                ws = HttpClient.newHttpClient()
+                        .newWebSocketBuilder()
+                        .connectTimeout(Duration.ofSeconds(5))
+                        .buildAsync(serverUri, this)
+                        .join();
+            } else {
+                ws = HttpClient.newHttpClient()
+                        .newWebSocketBuilder()
+                        .header("Authorization", "Bearer " + token)
+                        .connectTimeout(Duration.ofSeconds(5))
+                        .buildAsync(serverUri, this)
+                        .join();
+            }
+
 
             if (stopped) {
                 // stop() kam während des Verbindungsaufbaus

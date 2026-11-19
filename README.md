@@ -20,13 +20,27 @@ Alle Befehle im Projektverzeichnis.
 ./mvnw install -DskipTests
 ```
 
-**2. Backend starten** (Port 8080):
+**2. Einmalig Geräte-Tokens erzeugen**:
+
+Jedes Gerät meldet sich beim WebSocket-Handshake mit einem eigenen Token an (siehe [Authentifizierung](#authentifizierung)).
+`DeviceTokenGenerator` erzeugt pro Geräte-ID ein zufälliges Token (256 Bit, Base64url) und gibt zwei Blöcke aus:
+
+```bash
+./mvnw -pl backend exec:java "-Dexec.mainClass=de.jannik.devicehub.backend.auth.DeviceTokenGenerator" "-Dexec.args=sensor-1 sensor-2 sensor-3 sensor-fail"
+```
+
+- Die Zeilen `devicehub.device-token-hashes.*=...` (nur Hashes) in `backend/config/application.properties`
+  kopieren.
+- Die Zeilen `sensor-1=...` (Tokens im Klartext) in `device-tokens.properties` im Projektverzeichnis kopieren.
+  Der Simulator liest sie dort, ein anderer Pfad geht mit `-Ddevicehub.tokens-file=<datei>`.
+
+**3. Backend starten** (Port 8080):
 
 ```bash
 ./mvnw -pl backend spring-boot:run
 ```
 
-**3. Geräte-Simulator starten** (in einem zweiten Terminal):
+**4. Geräte-Simulator starten** (in einem zweiten Terminal):
 
 ```bash
 ./mvnw -pl devices exec:java
@@ -39,7 +53,7 @@ Anzahl und Backend-URL lassen sich übergeben:
 ./mvnw -pl devices exec:java -Dexec.args="5 ws://localhost:8080/ws/devices"
 ```
 
-**4. Dashboard öffnen:** <http://localhost:8080>
+**5. Dashboard öffnen:** <http://localhost:8080>
 
 Über den Button „Intervall ändern“ bekommt das Gerät einen `setInterval`-Befehl (POST-Request). Alternativ per HTTP
 (siehe auch [`request.http`](request.http)):
@@ -58,14 +72,16 @@ Dashboard als offline. Das Backend schließt daraufhin die Verbindung und der Si
 ./mvnw -pl devices exec:java "-Dexec.mainClass=de.jannik.devicehub.devices.FailedDeviceSimulator"
 ```
 
-### Geräte-Tokens erzeugen
+### Falsche oder keine Token simulieren
 
-`DeviceTokenGenerator` erzeugt pro Geräte-ID ein zufälliges Token (256 Bit, Base64url). Ausgegeben werden
-die SHA-256-Hashes als Properties für das Backend und die Tokens im Klartext für die Geräte.
+`NoAndWrongTokenSimulator` startet das Gerät `sensor-1`, 
+welches sich mit keinem Token und danach mit einem falschen Token authentifizieren möchte
 
 ```bash
-./mvnw -pl backend exec:java "-Dexec.mainClass=de.jannik.devicehub.backend.auth.DeviceTokenGenerator" "-Dexec.args=sensor-1 sensor-2 sensor-3"
+./mvnw -pl devices exec:java "-Dexec.mainClass=de.jannik.devicehub.devices.NoAndWrongTokenSimulator"
 ```
+
+
 
 ### Tests
 
@@ -107,7 +123,7 @@ die SHA-256-Hashes als Properties für das Backend und die Tokens im Klartext f�
 
 
 **`DeviceWebSocketHandler`** empfängt alle Gerätenachrichten (`hello`, `status`, `measurement`)
-  über den WebSocket und gibt sie an die `DeviceRegistry` weiter. Er merkt sich anhand der Hello Nachricht, welche Session zu
+  über den WebSocket und gibt sie an die `DeviceRegistry` weiter. Er merkt sich anhand der beim Handshake geprüften Geräte-ID, welche Session zu
   welcher Geräte-ID gehört, und schickt darüber Befehle an die Geräte.
 
 **`DeviceRegistry`** hält den Zustand aller Geräte (`DeviceState`, unveränderliche Records in einer
@@ -132,6 +148,23 @@ Das Projekt ist ein Maven-Multi-Modul-Build:
 Für das Dashboard wird SSE statt eines zweiten WebSockets verwendet: Die Daten fließen nur in eine
 Richtung, und `EventSource` verbindet sich im Browser von selbst neu.
 
+## Authentifizierung
+
+Jedes Gerät hat ein eigenes Token und schickt es beim WebSocket-Handshake als Header mit:
+
+```
+Authorization: Bearer <token>
+```
+
+- Das Backend speichert nur SHA-256-Hashes der Tokens (`devicehub.device-token-hashes.<deviceId>`).
+  Weil die Tokens 256 Bit Zufall enthalten, reicht SHA-256
+- `DeviceTokenHandshakeInterceptor` prüft das Token vor dem Handshake. Fehlt es oder ist es falsch, antwortet er mit
+  `401`, und es entsteht keine WebSocket-Session. Ist es gültig, legt er die Geräte-ID in den Session-Attributen ab.
+  Sie gilt dann für die ganze Verbindung.
+- Pro Gerät gibt es nur eine Verbindung. Verbindet sich ein Gerät neu, schließt das Backend die alte Session.
+
+Die Verbindung läuft lokal über `ws://`. Außerhalb von localhost muss es `wss://` (TLS) sein
+
 ## Protokoll
 
 Alle Nachrichten sind JSON-Textframes. Das Feld `type` bestimmt den Nachrichtentyp.
@@ -141,7 +174,9 @@ Alle Nachrichten sind JSON-Textframes. Das Feld `type` bestimmt den Nachrichtent
 ```json
 {"type":"hello","deviceId":"sensor-1"}
 ```
-Erste Nachricht nach dem Verbindungsaufbau. Damit wird die Session dem Gerät zugeordnet.
+Erste Nachricht nach dem Verbindungsaufbau. Die Session ist dem Gerät schon durch das Token zugeordnet.
+Passt `deviceId` nicht zum Token, schließt das Backend die Verbindung (1008, Policy Violation).
+Die `deviceId` in `status` und `measurement` wird ignoriert, es zählt die ID aus dem Token.
 
 ```json
 {"type":"status","deviceId":"sensor-1","intervalMs":3000}

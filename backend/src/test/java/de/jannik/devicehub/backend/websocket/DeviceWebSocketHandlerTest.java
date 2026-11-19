@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.jannik.devicehub.backend.auth.DeviceTokenHandshakeInterceptor;
 import de.jannik.devicehub.backend.helper.MutableClock;
 import de.jannik.devicehub.backend.events.DeviceTimedOutEvent;
 import de.jannik.devicehub.backend.registry.DeviceRegistry;
@@ -38,13 +39,23 @@ class DeviceWebSocketHandlerTest {
     }
 
     @Test
-    void lateCloseOfOldSessionDoesNotAffectReconnectedDevice() throws Exception {
-        WebSocketSession oldSession = session("old");
-        WebSocketSession newSession = session("new");
+    void connectionSetsAuthenticatedDeviceOnline() throws Exception {
+        WebSocketSession session = session("s1", "sensor-1");
 
-        handler.handleTextMessage(oldSession, json(new Message.Hello("sensor-1")));
+        handler.afterConnectionEstablished(session);
+
+        assertThat(device("sensor-1")).hasValueSatisfying(d -> assertThat(d.online()).isTrue());
+        assertThat(handler.sendCommand("sensor-1", new Message.Command("setInterval", 1000))).isTrue();
+    }
+
+    @Test
+    void lateCloseOfOldSessionDoesNotAffectReconnectedDevice() throws Exception {
+        WebSocketSession oldSession = session("old", "sensor-1");
+        WebSocketSession newSession = session("new", "sensor-1");
+
+        handler.afterConnectionEstablished(oldSession);
         // Gerät verbindet sich neu, bevor das Close der alten Session ankommt
-        handler.handleTextMessage(newSession, json(new Message.Hello("sensor-1")));
+        handler.afterConnectionEstablished(newSession);
         handler.afterConnectionClosed(oldSession, CloseStatus.SESSION_NOT_RELIABLE);
 
         assertThat(device("sensor-1")).hasValueSatisfying(d -> assertThat(d.online()).isTrue());
@@ -56,10 +67,22 @@ class DeviceWebSocketHandlerTest {
     }
 
     @Test
-    void closeOfCurrentSessionSetsDeviceOffline() throws Exception {
-        WebSocketSession session = session("s1");
+    void newConnectionClosesOldSessionOfSameDevice() throws Exception {
+        WebSocketSession oldSession = session("old", "sensor-1");
+        WebSocketSession newSession = session("new", "sensor-1");
 
-        handler.handleTextMessage(session, json(new Message.Hello("sensor-1")));
+        handler.afterConnectionEstablished(oldSession);
+        handler.afterConnectionEstablished(newSession);
+
+        verify(oldSession).close(any(CloseStatus.class));
+        verify(newSession, never()).close(any(CloseStatus.class));
+    }
+
+    @Test
+    void closeOfCurrentSessionSetsDeviceOffline() throws Exception {
+        WebSocketSession session = session("s1", "sensor-1");
+
+        handler.afterConnectionEstablished(session);
         handler.afterConnectionClosed(session, CloseStatus.NORMAL);
 
         assertThat(device("sensor-1")).hasValueSatisfying(d -> assertThat(d.online()).isFalse());
@@ -68,8 +91,8 @@ class DeviceWebSocketHandlerTest {
 
     @Test
     void timedOutDeviceSessionIsClosedAndReceivesNoMoreCommands() throws Exception {
-        WebSocketSession session = session("s1");
-        handler.handleTextMessage(session, json(new Message.Hello("sensor-1")));
+        WebSocketSession session = session("s1", "sensor-1");
+        handler.afterConnectionEstablished(session);
 
         handler.onDeviceTimedOut(new DeviceTimedOutEvent("sensor-1"));
 
@@ -86,11 +109,43 @@ class DeviceWebSocketHandlerTest {
     }
 
     @Test
-    void messageBeforeHelloClosesSessionAndIsIgnored() throws Exception {
-        WebSocketSession session = session("s1");
+    void helloWithMatchingIdIsAccepted() throws Exception {
+        WebSocketSession session = session("s1", "sensor-1");
+        handler.afterConnectionEstablished(session);
+
+        handler.handleTextMessage(session, json(new Message.Hello("sensor-1")));
+
+        verify(session, never()).close(any(CloseStatus.class));
+    }
+
+    @Test
+    void helloWithOtherIdThanTokenClosesSession() throws Exception {
+        WebSocketSession session = session("s1", "sensor-1");
+        handler.afterConnectionEstablished(session);
+
+        handler.handleTextMessage(session, json(new Message.Hello("sensor-2")));
+
+        verify(session).close(CloseStatus.POLICY_VIOLATION);
+        assertThat(device("sensor-2")).isEmpty();
+    }
+
+    @Test
+    void measurementIsStoredUnderIdFromTokenNotFromPayload() throws Exception {
+        WebSocketSession session = session("s1", "sensor-1");
+        handler.afterConnectionEstablished(session);
 
         handler.handleTextMessage(session,
-                json(new Message.Measurement("sensor-1", 21.5, Instant.parse("2026-11-09T10:00:00Z"))));
+                json(new Message.Measurement("sensor-2", 21.5, Instant.parse("2026-11-09T10:00:00Z"))));
+
+        assertThat(device("sensor-1")).hasValueSatisfying(d -> assertThat(d.lastMeasurement().value()).isEqualTo(21.5));
+        assertThat(device("sensor-2")).isEmpty();
+    }
+
+    @Test
+    void sessionWithoutAuthenticatedGetDeviceIdFromSessionIsClosed() throws Exception {
+        WebSocketSession session = session("s1", null);
+
+        handler.afterConnectionEstablished(session);
 
         verify(session).close(CloseStatus.POLICY_VIOLATION);
         assertThat(registry.all()).isEmpty();
@@ -98,10 +153,15 @@ class DeviceWebSocketHandlerTest {
 
     // --- Hilfsmethoden ---
 
-    private WebSocketSession session(String id) {
+    /** Session, wie sie nach dem Handshake aussieht: deviceId hat der Interceptor gesetzt (null = ohne). */
+    private WebSocketSession session(String id, String deviceId) {
         WebSocketSession session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn(id);
-        when(session.getAttributes()).thenReturn(new HashMap<>());
+        var attributes = new HashMap<String, Object>();
+        if (deviceId != null) {
+            attributes.put(DeviceTokenHandshakeInterceptor.DEVICE_ID_ATTRIBUTE, deviceId);
+        }
+        when(session.getAttributes()).thenReturn(attributes);
         when(session.isOpen()).thenReturn(true);
         return session;
     }
