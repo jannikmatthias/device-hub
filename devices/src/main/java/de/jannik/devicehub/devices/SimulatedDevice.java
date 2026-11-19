@@ -4,6 +4,7 @@ import de.jannik.devicehub.protocol.Message;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.net.http.WebSocketHandshakeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.*;
@@ -15,6 +16,8 @@ public class SimulatedDevice implements WebSocket.Listener {
     private static final JsonMapper mapper = JsonMapper.builder().build();
 
     private final String deviceId;
+    // wird beim Handshake als "Authorization: Bearer <token>" geschickt
+    private final String token;
     private final URI serverUri;
     private volatile long intervalMs = 3000;
     private final ScheduledExecutorService scheduler;
@@ -27,8 +30,9 @@ public class SimulatedDevice implements WebSocket.Listener {
     // stop(): kein Reconnect mehr
     private volatile boolean stopped;
 
-    public SimulatedDevice(String deviceId, URI serverUri) {
+    public SimulatedDevice(String deviceId, String token, URI serverUri) {
         this.deviceId = deviceId;
+        this.token = token;
         this.serverUri = serverUri;
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
     }
@@ -70,6 +74,7 @@ public class SimulatedDevice implements WebSocket.Listener {
         try {
             ws = HttpClient.newHttpClient()
                     .newWebSocketBuilder()
+                    .header("Authorization", "Bearer " + token)
                     .connectTimeout(Duration.ofSeconds(5))
                     .buildAsync(serverUri, this)
                     .join();
@@ -91,7 +96,11 @@ public class SimulatedDevice implements WebSocket.Listener {
             if (stopped) {
                 return;
             }
-            System.err.println(deviceId + ": Verbindung fehlgeschlagen, neuer Versuch in "
+            String reason = e.getCause() instanceof WebSocketHandshakeException hs
+                    && hs.getResponse().statusCode() == 401
+                    ? "Token abgelehnt (HTTP 401)"
+                    : "Verbindung fehlgeschlagen";
+            System.err.println(deviceId + ": " + reason + ", neuer Versuch in "
                     + reconnectDelayMs + " ms");
             scheduler.schedule(this::connect, reconnectDelayMs, TimeUnit.MILLISECONDS);
             //Reconnect backoff

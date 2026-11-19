@@ -15,7 +15,8 @@ public class FailedDeviceSimulator {
     public static void main(String[] args) throws InterruptedException {
         URI uri = URI.create(args.length > 0 ? args[0] : DeviceSimulator.DEFAULT_URL);
 
-        SimulatedDevice simulatedDevice = new SimulatedDevice("sensor-fail", uri);
+        String token = DeviceTokensFile.tokenOrExit(DeviceTokensFile.loadOrExit(), "sensor-fail");
+        SimulatedDevice simulatedDevice = new SimulatedDevice("sensor-fail", token, uri);
         simulatedDevice.start();
         Thread.sleep(Duration.ofSeconds(10));
         System.out.println("sensor-fail: sendet ab jetzt nichts mehr, Verbindung bleibt offen");
