@@ -17,8 +17,9 @@ public final class DeviceTokenGenerator {
 
     static final String PROPERTY_PREFIX = "devicehub.device-token-hashes.";
 
-    // Die ID wird Teil eines Property-Keys, daher keine Leerzeichen, '=' oder ':'
-    private static final Pattern VALID_DEVICE_ID = Pattern.compile("[A-Za-z0-9._-]+");
+    // Die ID wird Teil eines Property-Keys, daher keine Leerzeichen, '=', ':' oder '.'
+    // ('.' würde Spring beim Binden als Pfadtrenner lesen)
+    private static final Pattern VALID_DEVICE_ID = Pattern.compile("[A-Za-z0-9_-]+");
 
     record DeviceCredential(String deviceId, String token, String hash) {
     }
@@ -47,7 +48,7 @@ public final class DeviceTokenGenerator {
         var unique = new LinkedHashSet<String>();
         for (String id : deviceIds) {
             if (!VALID_DEVICE_ID.matcher(id).matches()) {
-                throw new IllegalArgumentException("Ungueltige Geraete-ID '" + id + "', erlaubt sind A-Z, a-z, 0-9, '.', '_' und '-'");
+                throw new IllegalArgumentException("Ungueltige Geraete-ID '" + id + "', erlaubt sind A-Z, a-z, 0-9, '_' und '-'");
             }
             if (!unique.add(id)) {
                 throw new IllegalArgumentException("Geraete-ID '" + id + "' ist doppelt angegeben");

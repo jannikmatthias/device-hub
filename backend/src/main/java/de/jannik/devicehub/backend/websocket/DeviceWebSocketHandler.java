@@ -1,5 +1,6 @@
 package de.jannik.devicehub.backend.websocket;
 
+import de.jannik.devicehub.backend.auth.DeviceTokenHandshakeInterceptor;
 import de.jannik.devicehub.backend.events.DeviceTimedOutEvent;
 import de.jannik.devicehub.backend.registry.DeviceRegistry;
 import de.jannik.devicehub.protocol.Message;
@@ -33,53 +34,78 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
         this.deviceRegistry = deviceRegistry;
     }
 
+    /**
+     * Die Geräte-ID hat der {@link DeviceTokenHandshakeInterceptor} beim Handshake aus dem Token ermittelt.
+     * Sie gilt für die ganze Verbindung, IDs in den Nachrichten werden dafür nicht verwendet.
+     */
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
-        log.info("Verbunden: {}", session.getId());
-    }
-
-    @Override
-    public void handleTextMessage(@NonNull WebSocketSession session, TextMessage text) throws IOException {
-        Message msg;
-        try {
-            msg = mapper.readValue(text.getPayload(), Message.class);
-        } catch (JacksonException e) {
-            log.warn("Ungültige Nachricht von {}: {}", session.getId(), text.getPayload());
-            return;
-        }
-
-        //null, wenn noch keine Hello message
-        String deviceId = (String) session.getAttributes().get("deviceId");
-
-        if (msg instanceof Message.Hello hello) {
-            handleHello(session, hello);
-            return;
-        }
+    public void afterConnectionEstablished(@NonNull WebSocketSession session) throws IOException {
+        String deviceId = getDeviceIdFromSession(session);
         if (deviceId == null) {
-            log.warn("Nachricht vor Hello von {}, Verbindung wird geschlossen", session.getId());
+            // nur möglich, wenn der Handler ohne Interceptor registriert wurde
+            log.error("Session {} ohne authentifizierte Geräte-ID, wird geschlossen", session.getId());
             session.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
 
-        switch (msg) {
-            case Message.Measurement m -> deviceRegistry.setLastMeasurement(deviceId, m.value(), m.timestamp());
-            case Message.Status s      -> deviceRegistry.setIntervalMs(deviceId, s.intervalMs());
-            case Message.Command ignored -> log.warn("{} hat einen Command geschickt, ignoriert", deviceId);
-            // oben behandelt
-            default -> throw new IllegalStateException("Unexpected value: " + msg);
+        //Decorator: behandelt gleichzeitiges sendMessage
+        WebSocketSession previous = sessions.put(deviceId,
+                new ConcurrentWebSocketSessionDecorator(session, 5_000, 64 * 1024));
+        deviceRegistry.setIsOnline(deviceId, true);
+        log.info("Verbunden: {} ({})", deviceId, session.getId());
+
+        if (previous != null) {
+            // Pro Gerät nur eine Verbindung: die alte schließen
+            log.info("{} hat sich neu verbunden, alte Session {} wird geschlossen", deviceId, previous.getId());
+            closeQuietly(previous, CloseStatus.NORMAL.withReason("Durch neue Verbindung ersetzt"));
         }
     }
 
-    private void handleHello(WebSocketSession session, Message.@NonNull Hello hello) {
-        //Decorator: behandelt gleichzeitiges sendMessage
-        sessions.put(hello.deviceId(), new ConcurrentWebSocketSessionDecorator(session, 5_000, 64 * 1024));
-        deviceRegistry.setIsOnline(hello.deviceId(), true);
-        session.getAttributes().put("deviceId", hello.deviceId());
+    @Override
+    public void handleTextMessage(@NonNull WebSocketSession session, TextMessage text) throws IOException {
+        String deviceId = getDeviceIdFromSession(session);
+        if (deviceId == null) {
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
+        Message msg;
+        try {
+            msg = mapper.readValue(text.getPayload(), Message.class);
+        } catch (JacksonException e) {
+            log.warn("Ungültige Nachricht von {}: {}", deviceId, text.getPayload());
+            return;
+        }
+
+        switch (msg) {
+            case Message.Hello hello -> {
+                // Hello ist nur noch eine Plausibilitätsprüfung: Die ID muss zum Token passen
+                if (!deviceId.equals(hello.deviceId())) {
+                    log.warn("{} meldet sich als '{}', Verbindung wird geschlossen", deviceId, hello.deviceId());
+                    session.close(CloseStatus.POLICY_VIOLATION);
+                }
+            }
+            case Message.Measurement m -> deviceRegistry.setLastMeasurement(deviceId, m.value(), m.timestamp());
+            case Message.Status s      -> deviceRegistry.setIntervalMs(deviceId, s.intervalMs());
+            case Message.Command ignored -> log.warn("{} hat einen Command geschickt, ignoriert", deviceId);
+        }
+    }
+
+    private static String getDeviceIdFromSession(WebSocketSession session) {
+        return (String) session.getAttributes().get(DeviceTokenHandshakeInterceptor.DEVICE_ID_ATTRIBUTE);
+    }
+
+    private static void closeQuietly(WebSocketSession session, CloseStatus status) {
+        try {
+            session.close(status);
+        } catch (IOException e) {
+            log.debug("Schließen der Session {} fehlgeschlagen", session.getId(), e);
+        }
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, @NonNull CloseStatus status) {
-        String deviceId = (String) session.getAttributes().get("deviceId");
+        String deviceId = getDeviceIdFromSession(session);
         if (deviceId != null) {
             // Nur entfernen, wenn noch diese Session eingetragen ist. Hat sich das Gerät
             // inzwischen neu verbunden, nicht entfernen.
@@ -105,11 +131,7 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
         if (session == null) {
             return;
         }
-        try {
-            session.close(CloseStatus.SESSION_NOT_RELIABLE);
-        } catch (IOException e) {
-            log.debug("Schließen der Session von {} fehlgeschlagen", event.deviceId(), e);
-        }
+        closeQuietly(session, CloseStatus.SESSION_NOT_RELIABLE);
     }
 
     /** @return false, wenn das Gerät nicht verbunden ist */
