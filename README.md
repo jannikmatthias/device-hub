@@ -58,6 +58,15 @@ Dashboard als offline. Das Backend schließt daraufhin die Verbindung und der Si
 ./mvnw -pl devices exec:java "-Dexec.mainClass=de.jannik.devicehub.devices.FailedDeviceSimulator"
 ```
 
+### Geräte-Tokens erzeugen
+
+`DeviceTokenGenerator` erzeugt pro Geräte-ID ein zufälliges Token (256 Bit, Base64url). Ausgegeben werden
+die SHA-256-Hashes als Properties für das Backend und die Tokens im Klartext für die Geräte.
+
+```bash
+./mvnw -pl backend exec:java "-Dexec.mainClass=de.jannik.devicehub.backend.auth.DeviceTokenGenerator" "-Dexec.args=sensor-1 sensor-2 sensor-3"
+```
+
 ### Tests
 
 ```bash
