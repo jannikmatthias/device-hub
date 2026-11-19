@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-import de.jannik.devicehub.backend.auth.DeviceTokens;
+import de.jannik.devicehub.backend.auth.DeviceTokenHasher;
 import de.jannik.devicehub.backend.registry.DeviceState;
 import de.jannik.devicehub.protocol.Message;
 import java.net.URI;
@@ -37,7 +37,7 @@ class DeviceHubIntegrationTest {
 
     @DynamicPropertySource
     static void deviceTokens(DynamicPropertyRegistry registry) {
-        registry.add("devicehub.device-token-hashes.test-1", () -> DeviceTokens.hash(TOKEN));
+        registry.add("devicehub.device-token-hashes.test-1", () -> DeviceTokenHasher.hash(TOKEN));
     }
 
     @Value("${local.server.port}")

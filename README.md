@@ -26,7 +26,7 @@ Jedes Gerät meldet sich beim WebSocket-Handshake mit einem eigenen Token an (si
 `DeviceTokenGenerator` erzeugt pro Geräte-ID ein zufälliges Token (256 Bit, Base64url) und gibt zwei Blöcke aus:
 
 ```bash
-./mvnw -pl backend exec:java "-Dexec.mainClass=de.jannik.devicehub.backend.auth.DeviceTokenGenerator" "-Dexec.args=sensor-1 sensor-2 sensor-3 sensor-fail"
+./mvnw -pl backend exec:java "-Dexec.mainClass=de.jannik.devicehub.backend.auth.generate_tokens.DeviceTokenGenerator" "-Dexec.args=sensor-1 sensor-2 sensor-3 sensor-fail"
 ```
 
 - Die Zeilen `devicehub.device-token-hashes.*=...` (nur Hashes) in `backend/config/application.properties`
@@ -156,11 +156,12 @@ Jedes Gerät hat ein eigenes Token und schickt es beim WebSocket-Handshake als H
 Authorization: Bearer <token>
 ```
 
-- Das Backend speichert nur SHA-256-Hashes der Tokens (`devicehub.device-token-hashes.<deviceId>`).
+- Das Backend speichert nur SHA-256-Hashes der Tokens (`devicehub.device-token-hashes.<deviceId>`). (`DeviceTokenStore` liest diese Hashes)
   Weil die Tokens 256 Bit Zufall enthalten, reicht SHA-256
 - `DeviceTokenHandshakeInterceptor` prüft das Token vor dem Handshake. Fehlt es oder ist es falsch, antwortet er mit
   `401`, und es entsteht keine WebSocket-Session. Ist es gültig, legt er die Geräte-ID in den Session-Attributen ab.
   Sie gilt dann für die ganze Verbindung.
+- Die Hello-Nachricht ist nun nur noch eine Plausibilitätsprüfung: Die ID muss zum Token passen
 - Pro Gerät gibt es nur eine Verbindung. Verbindet sich ein Gerät neu, schließt das Backend die alte Session.
 
 Die Verbindung läuft lokal über `ws://`. Außerhalb von localhost muss es `wss://` (TLS) sein

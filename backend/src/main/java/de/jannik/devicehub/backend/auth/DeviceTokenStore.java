@@ -1,5 +1,6 @@
 package de.jannik.devicehub.backend.auth;
 
+import de.jannik.devicehub.backend.auth.generate_tokens.DeviceTokenGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -65,6 +66,6 @@ public class DeviceTokenStore {
         if (token == null || token.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(deviceIdByHash.get(DeviceTokens.hash(token)));
+        return Optional.ofNullable(deviceIdByHash.get(DeviceTokenHasher.hash(token)));
     }
 }

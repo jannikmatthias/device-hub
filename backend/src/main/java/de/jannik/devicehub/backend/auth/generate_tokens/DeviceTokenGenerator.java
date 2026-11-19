@@ -1,4 +1,6 @@
-package de.jannik.devicehub.backend.auth;
+package de.jannik.devicehub.backend.auth.generate_tokens;
+
+import de.jannik.devicehub.backend.auth.DeviceTokenHasher;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -57,7 +59,7 @@ public final class DeviceTokenGenerator {
         return unique.stream()
                 .map(id -> {
                     String token = DeviceTokens.generate();
-                    return new DeviceCredential(id, token, DeviceTokens.hash(token));
+                    return new DeviceCredential(id, token, DeviceTokenHasher.hash(token));
                 })
                 .toList();
     }

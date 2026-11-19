@@ -18,7 +18,7 @@ class DeviceTokenHandshakeInterceptorTest {
     private static final String TOKEN = "token-sensor-1";
 
     private final DeviceTokenHandshakeInterceptor interceptor = new DeviceTokenHandshakeInterceptor(
-            new DeviceTokenStore(new DeviceTokenStore.Properties(Map.of("sensor-1", DeviceTokens.hash(TOKEN)))));
+            new DeviceTokenStore(new DeviceTokenStore.Properties(Map.of("sensor-1", DeviceTokenHasher.hash(TOKEN)))));
 
     private final MockHttpServletResponse servletResponse = new MockHttpServletResponse();
     private final Map<String, Object> attributes = new HashMap<>();
